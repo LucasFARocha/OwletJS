@@ -4,6 +4,7 @@ exports.scrapeCB = async function(produto){
     // Launch the browser and open a new blank page
     const browser = await pup.launch({
         headless: false,
+        // executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
         // `headless: true` (default) enables old Headless;
         // `headless: 'new'` enables new Headless;
         // `headless: false` enables “headful” mode.

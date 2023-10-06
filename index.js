@@ -1,9 +1,14 @@
-const scraperAmazon = require('./scraperAmazon');
-const scraperKabum = require('./scraperKabum');
+ const scraperAmazon = require('./scraperAmazon');
+// const scraperKabum = require('./scraperKabum');
+// const scraperSub = require('./scraperSub');
+ const scraperMagalu = require('./scraperMagalu');
+// const scraperCB = require('./scraperCB');
+
+const createGroup = require('./createGroups');
 const fs = require('fs');
 
 // Lista de produtos para pesquisar na Amazon
-const pesquisa = ['notebook','mousepad'];
+const pesquisa = ['Notebook Alienware'];
 
 app();
 
@@ -19,21 +24,40 @@ async function app() {
         // Adiciona os produtos encontrados ao array final
         encontrados.push(...produtosAmazon);
 
-        const produtosKabum = await scraperKabum.scrape(produto);
-        encontrados.push(...produtosKabum);
+        // const produtosKabum = await scraperKabum.scrape(produto);
+        // encontrados.push(...produtosKabum);
+
+        // const produtosSub = await scraperSub.scrape(produto);
+        // encontrados.push(...produtosSub);
+
+         const produtosMagalu = await scraperMagalu.scrape(produto);
+         encontrados.push(...produtosMagalu);
+
+        // const produtosCB = await scraperCB.scrapeCB(produto);
+        // encontrados.push(...produtosCB);
       }
-      
-      //console.log(encontrados);
-      fs.writeFile('./produtos.json', JSON.stringify(encontrados), err => err ? console.log(err): null);
+      const groups = createGroup.createProductGroups(encontrados);
+      const groupProductFormatted = {};
+
+       // Exibe os grupos resultantes
+        for (const groupName in groups) 
+        {
+          const productsList = groups[groupName].join(" / ");
+          groupProductFormatted[groupName] = productsList;
+        }
+
+        //console.log(encontrados);
+        fs.writeFile('./produtos.json', JSON.stringify(encontrados), err => err ? console.log(err): null);
+        
+        console.log("Group Product Formatted:", groupProductFormatted);
+        fs.writeFile('./groups.json', JSON.stringify(groupProductFormatted), err => err ? console.log(err): null);
 
     }catch(error){
       console.log("\n" + error);
     }
   }
 
-
-
-
+  
 
 
   //   await Promise.all([
@@ -86,16 +110,18 @@ async function app() {
 
 // const express = require('express');
 // //const { default: puppeteer } = require('puppeteer');
-// const puppeteer = require('puppeteer');
+
+// const scraperAmazon = require('./scraperAmazon');
+// const fs = require('fs');
+// const createGroup = require('./createGroups');
 
 // const app = express();
 // const port = 3000;
 
-// const amazonURLBase = 'https://www.amazon.com.br/s?k=';
-// const amazonURL = 'https://www.amazon.com.br';
+// //const amazonURLBase = 'https://www.amazon.com.br/s?k=';
 
 // // Lista de produtos para pesquisar na Amazon
-// const produtosParaPesquisar = ['motorola 64gb 8gb ram', 'mistborn'];
+// const produtosParaPesquisar = ['Smartphone motorola'];
 
 // app.get('/buscarProdutos', async (req, res) => {
 //   try {
@@ -104,17 +130,33 @@ async function app() {
 
 //     // Loop para pesquisar cada produto da lista
 //     for (const produto of produtosParaPesquisar) {
-//       const products = await scrapeAmazonProducts(produto);
+//       const products = await scraperAmazon.scrape(produto);
 
 //       // Adiciona os produtos encontrados ao array final
 //       produtosEncontrados.push(...products);
 //     }
 
+//     const groups = createGroup.createProductGroups(produtosEncontrados);
+//     const groupProductFormatted = {};
+
+//       // Exibe os grupos resultantes
+//       for (const groupName in groups)
+//       {
+//         const productsList = groups[groupName].join(" / ");
+//         groupProductFormatted[groupName] = productsList;
+//       }
+
+//     //console.log(encontrados);
+//     fs.writeFile('./produtos.json', JSON.stringify(produtosEncontrados), err => err ? console.log(err): null);
+//     console.log("Group Product Formatted:", groupProductFormatted);
+//     fs.writeFile('./groups.json', JSON.stringify(groupProductFormatted), err => err ? console.log(err): null);
+
 //     // Retorna o resultado da pesquisa em formato JSON
 //     res.json(produtosEncontrados);
 //   } catch (error) {
 //     // Se ocorrer um erro, envia uma resposta com status 500 e mensagem de erro
-//     res.status(500).json({ error: 'Ocorreu um erro ao buscar os produtos na Amazon.' });
+//     res.status(500).json(error);
+//     console.log(error);
 //   }
 // });
 
@@ -125,11 +167,11 @@ async function app() {
 //   const url = amazonURLBase + encodeURIComponent(nomeProduto);
 
 //   await page.goto(url, { waitUntil: 'domcontentloaded' });
-//   await page.waitForSelector('.s-card-container.s-overflow-hidden.aok-relative.puis-expand-height.puis-include-content-margin.puis.puis-v1g4cn23aiw4pq21ytu1qia8qu3.s-latency-cf-section.s-card-border');
+//   await page.waitForSelector('.s-card-container.s-overflow-hidden.aok-relative.puis-expand-height.puis-include-content-margin.puis');
 
 //   // Executa o script no contexto da página para extrair os produtos
 //   const products = await page.evaluate(() => {
-//     const productElements = document.querySelectorAll('.s-card-container.s-overflow-hidden.aok-relative.puis-expand-height.puis-include-content-margin.puis.puis-v1g4cn23aiw4pq21ytu1qia8qu3.s-latency-cf-section.s-card-border');
+//     const productElements = document.querySelectorAll('.s-card-container.s-overflow-hidden.aok-relative.puis-expand-height.puis-include-content-margin.puis');
 //     const productsList = [];
 
 //     productElements.forEach((product) => {

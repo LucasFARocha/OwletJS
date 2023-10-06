@@ -9,38 +9,42 @@ exports.scrape = async function(produto){
         // `headless: false` enables “headful” mode.
       });
     const page = await browser.newPage(); 
-    const url = "https://www.kabum.com.br/";
+    const url = "https://www.magazineluiza.com.br/";
 
     await page.goto(url);
 
-    await page.waitForSelector('#input-busca');
-    await page.type('#input-busca', produto);
+    await page.waitForSelector('#input-search');
+    await page.type('#input-search', produto);
 
     await Promise.all([
       page.waitForNavigation(),
-      await page.keyboard.press('Enter'),
+      page.click('.sc-eqUAAy.IubVJ'),
     ])
 
-    await page.waitForSelector('.sc-d55b419d-7.bwqahi.productCard');
+    await page.waitForSelector('.sc-APcvf.eJDyHN');
     
     const scrape = await page.evaluate(() => {
-      const elementos = document.querySelectorAll('.sc-d55b419d-7.bwqahi.productCard');
+      const elementos = document.querySelectorAll('.sc-APcvf.eJDyHN');
       const lista = [];
 
       let id = 0;
       elementos.forEach((produto) => {
         
-        const tituloBruto = produto.querySelector('.sc-d79c9c3f-0.nlmfp');
+        const tituloBruto = produto.querySelector('.sc-eWzREE.uaEbk');
         const titulo = tituloBruto ? tituloBruto.textContent.trim(): '';
         
-        const linkBruto = produto.querySelector('.sc-d55b419d-10.dUPmeM.productLink');
-        const linkProduto = linkBruto ? linkBruto.getAttribute('href') : '';
-        const link = "https://www.kabum.com.br" + linkProduto;
+        const linkBruto = produto.querySelector('.sc-APcvf.eJDyHN');
+        // const linkBruto = produto.querySelector('.sc-dxlmjS.gjCMbP');
+        const linkProduto = linkBruto ? linkBruto.getAttribute('href'): '';
+        console.log(linkProduto)
 
-        const precoBruto = produto.querySelector('.sc-3b515ca1-2.chPrxA.priceCard');
+
+        const link = "https://www.magazineluiza.com.br/" + linkProduto;
+
+        const precoBruto = produto.querySelector('.sc-kpDqfm.eCPtRw.sc-hoLEA.kXWuGr');
         const preco = precoBruto ? precoBruto.textContent.trim() : '';
 
-        const imagemBruto = produto.querySelector('.imageCard');
+        const imagemBruto = produto.querySelector('.sc-cWSHoV.bLJsBf');
         const imagem = imagemBruto ? imagemBruto.getAttribute('src') : '';
 
         id++;

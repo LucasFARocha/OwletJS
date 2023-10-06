@@ -24,7 +24,7 @@ exports.scrape = async function(produto){
     await page.waitForSelector('.s-card-container.s-overflow-hidden.aok-relative.puis-expand-height.puis-include-content-margin.puis.puis-v1g4cn23aiw4pq21ytu1qia8qu3.s-latency-cf-section.s-card-border');
     
     const scrape = await page.evaluate(() => {
-      const elementos = document.querySelectorAll('.s-card-container.s-overflow-hidden.aok-relative.puis-expand-height.puis-include-content-margin.puis.puis-v1g4cn23aiw4pq21ytu1qia8qu3.s-latency-cf-section.s-card-border');
+      const elementos = document.querySelectorAll('.s-card-container.s-overflow-hidden.aok-relative.puis-expand-height.puis-include-content-margin.puis');
       const lista = [];
 
       let id = 0;
