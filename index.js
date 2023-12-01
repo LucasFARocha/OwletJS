@@ -1,210 +1,285 @@
- const scraperAmazon = require('./scraperAmazon');
-// const scraperKabum = require('./scraperKabum');
-// const scraperSub = require('./scraperSub');
- const scraperMagalu = require('./scraperMagalu');
-// const scraperCB = require('./scraperCB');
+const api = require('./api-request/request')
+const scraperAmazon = require('./scrapers/scraperAmazon');
+// Kabum e muito lerda
+// const scraperKabum = require('./scrapers/scraperKabum');
+const scraperSub = require('./scrapers/scraperSub');
+const scraperMagalu = require('./scrapers/scraperMagalu');
+const scraperML = require('./scrapers/scraperMercadoLivre');
+const scraperPontoFrio = require('./scrapers/scraperPontoFrio');
+const scraperExtra = require('./scrapers/scraperExtra.js');
+const scraperCB = require('./scrapers/scraperCB');
 
 const createGroup = require('./createGroups');
-const fs = require('fs');
+const fs = require('fs/promises');
 
-// Lista de produtos para pesquisar na Amazon
-const pesquisa = ['Notebook Alienware'];
+// Lista de produtos para pesquisar nas lojas
+const pesquisa = ['Smartphone iPhone'];
+
+async function app() {
+  try {
+    const encontrados = await Promise.all(
+      pesquisa.map(async (produto) => {
+        // Remova ou comente a chamada para o scraper da Amazon
+        // return await scraperAmazon.scrape(produto);
+
+        const resultados = [];
+
+        // Adicione chamadas para os outros scrapers conforme necessário
+        const produtosAmazon = await scraperAmazon.scrape(produto);
+        resultados.push(...produtosAmazon);
+
+        const produtosCB = await scraperCB.scrape(produto);
+        resultados.push(...produtosCB);
+
+        const produtosExtra = await scraperExtra.scrape(produto);
+        resultados.push(...produtosExtra);
+
+        const produtosMagalu = await scraperMagalu.scrape(produto);
+        resultados.push(...produtosMagalu);
+
+        const produtosML = await scraperML.scrape(produto);
+        resultados.push(...produtosML);
+
+        const produtosPontoFrio = await scraperPontoFrio.scrape(produto);
+        resultados.push(...produtosPontoFrio);
+        
+        const produtosSub = await scraperSub.scrape(produto);
+        resultados.push(...produtosSub);
+        
+        // Retorne os resultados dos outros scrapers
+        return resultados;
+      })
+      //...produtosExtra, ...produtosMagalu, ...produtosML, produtosPontoFrio, ...produtosSub
+    );
+
+    const sliceSize = encontrados.length > 2 ? encontrados.length + 3 : encontrados.length + 2;
+    const groups = createGroup.createProductGroups(encontrados.flat(), sliceSize);
+
+    const groupProductFormatted = {};
+
+        // Exibe os grupos resultantes
+    for (const groupName in groups) {
+      if (groups[groupName] && groups[groupName].products.length > 0) {
+        const productsList = groups[groupName].products.map((product) => ({
+          titulo: product.titulo,
+          loja: product.loja,
+          preco: product.preco,
+          avaliacao: product.avaliacao,
+          //avaliacao: product.avaliacao
+        }));
+        groupProductFormatted[groupName] = {
+          products: productsList,
+          totalPrice: groups[groupName].totalPrice,
+          avgPrice: groups[groupName].avgPrice
+        };
+      }
+    }
+
+    const currentDate = new Date().toISOString().split('T')[0]; // Get the current date
+
+    for (const groupName in groups) {
+      if (groups[groupName] && groups[groupName].products.length > 0) {
+        const group = groups[groupName];
+        
+        // Create the group data to save using the /groups endpoint
+        const groupData = {
+          grp_nome: groupName,
+          grp_precomedio: group.avgPrice,
+          ctg_id: 2, // Default category_id (You can modify this based on the group)
+        };
+
+        try {
+          // Save the group data using the /groups endpoint
+          const groupResponse = await api.request('http://localhost:3000/groups', 'POST', groupData);
+
+          console.log("Group Response Data", groupResponse);
+
+          const groupCurrent = await api.request('http://localhost:3000/groupsByName/'+groupName, 'GET');
+            
+          for (const product of group.products) {
+
+              console.log("Product Data", product);
+              // Fetch the group ID based on the group name
+              // const groupId = await fetchGroupId(groupName); // Not needed anymore
+
+              const productData = {
+                pdt_descricao: product.titulo,
+                pdt_preco: product.preco,
+                pdt_imagem: product.imagem,
+                pdt_avaliacao: product.avaliacao,
+                pdt_adicionadoem: currentDate, // Set the added date to the current date
+                pdt_alteradoem: currentDate, // Set the updated date to the current date
+                pdt_link: product.link,
+                for_id: product.id_fornecedor,
+                grp_id: groupCurrent.grp_id, // Set the group ID based on the created group
+              };
+
+              try {
+                const apiResponse = await api.request('http://localhost:3000/products', 'POST', productData);
+                console.log(`Produto salvo na API:`, apiResponse);
+              } catch (error) {
+                console.log(`Erro ao salvar o produto na API:`, error);
+              }
+            }
+           
+        } catch (error) {
+          console.log(`Erro ao criar o grupo:`, error);
+        }
+      }
+    }
+
+    // Save the product data and group information to files (if needed)
+    
+    fs.writeFile('./produtos.json', JSON.stringify(encontrados), err => err ? console.log(err): null);
+    //console.log("Group Product Formatted:", groupProductFormatted);
+    fs.writeFile('./groups.json', JSON.stringify(groupProductFormatted), err => err ? console.log(err): null);
+
+    console.log("Operações concluídas com sucesso!");
+  } catch (error) {
+    console.log("Erro:", error);
+  }
+}
 
 app();
 
-async function app() {
-    try{
-      // Array para armazenar os resultados finais
-      const encontrados = [];
-  
-      for(const produto of pesquisa)
-      {
-        //Declara produtos como o resultado da função de scraping
-        const produtosAmazon = await scraperAmazon.scrape(produto);
-        // Adiciona os produtos encontrados ao array final
-        encontrados.push(...produtosAmazon);
-
-        // const produtosKabum = await scraperKabum.scrape(produto);
-        // encontrados.push(...produtosKabum);
-
-        // const produtosSub = await scraperSub.scrape(produto);
-        // encontrados.push(...produtosSub);
-
-         const produtosMagalu = await scraperMagalu.scrape(produto);
-         encontrados.push(...produtosMagalu);
-
-        // const produtosCB = await scraperCB.scrapeCB(produto);
-        // encontrados.push(...produtosCB);
-      }
-      const groups = createGroup.createProductGroups(encontrados);
-      const groupProductFormatted = {};
-
-       // Exibe os grupos resultantes
-        for (const groupName in groups) 
-        {
-          const productsList = groups[groupName].join(" / ");
-          groupProductFormatted[groupName] = productsList;
-        }
-
-        //console.log(encontrados);
-        fs.writeFile('./produtos.json', JSON.stringify(encontrados), err => err ? console.log(err): null);
-        
-        console.log("Group Product Formatted:", groupProductFormatted);
-        fs.writeFile('./groups.json', JSON.stringify(groupProductFormatted), err => err ? console.log(err): null);
-
-    }catch(error){
-      console.log("\n" + error);
-    }
-  }
-
-  
-
-
-  //   await Promise.all([
-  //       page.waitForNavigation(),
-  //       page.click('#nav-search-submit-button'),
-  //       // console.log('Pesquisei')
-  //   ])
-
-  //   //const ignore = ".puis-label-popover.puis-sponsored-label-text";
-
-  //   await page.waitForSelector('.a-size-base-plus.a-color-base.a-text-normal');
-  //   const titulo = await page.$eval('.a-size-base-plus.a-color-base.a-text-normal', element => element.innerText);
-  //   const reais = await page.$eval('.a-offscreen', element => element.innerText); 
-  //   //const cents = await page.$eval('.a-price-fraction', element => element.innerText); 
-
-  //   //const preco = "R$" + reais;
-    
-  //   // console.log(titulo);
-  //   // console.log(reais);
-
-
-
-  // //   await Promise.all([
-  // //     page.waitForNavigation(),
-  // //     page.click('.s-pagination-separator'),
-  // //     console.log('Fui para a próxima página')
-  // // ])
-
-
-
-
-  // //   await Promise.all([
-  // //     page.waitForNavigation(),
-  // //     page.click('.s-image'),
-  // //     console.log('Entrei')
-  // // ])
-  //   //new Promise(r => setTimeout(r, 5000));
-  
-  //   await browser.close();
-  
-
-
-
-
-
-
-
-
-
-
-// const express = require('express');
-// //const { default: puppeteer } = require('puppeteer');
-
-// const scraperAmazon = require('./scraperAmazon');
-// const fs = require('fs');
-// const createGroup = require('./createGroups');
-
-// const app = express();
-// const port = 3000;
-
-// //const amazonURLBase = 'https://www.amazon.com.br/s?k=';
-
-// // Lista de produtos para pesquisar na Amazon
-// const produtosParaPesquisar = ['Smartphone motorola'];
-
-// app.get('/buscarProdutos', async (req, res) => {
-//   try {
-//     // Array para armazenar os resultados finais
-//     const produtosEncontrados = [];
-
-//     // Loop para pesquisar cada produto da lista
-//     for (const produto of produtosParaPesquisar) {
-//       const products = await scraperAmazon.scrape(produto);
-
-//       // Adiciona os produtos encontrados ao array final
-//       produtosEncontrados.push(...products);
-//     }
-
-//     const groups = createGroup.createProductGroups(produtosEncontrados);
-//     const groupProductFormatted = {};
-
-//       // Exibe os grupos resultantes
-//       for (const groupName in groups)
-//       {
-//         const productsList = groups[groupName].join(" / ");
-//         groupProductFormatted[groupName] = productsList;
+//     // Exibe os grupos resultantes
+//     for (const groupName in groups) {
+//       if (groups[groupName] && groups[groupName].products.length > 0) {
+//         const productsList = groups[groupName].products.map((product) => ({
+//           titulo: product.titulo,
+//           loja: product.loja,
+//           preco: product.preco,
+//           avaliacao: product.avaliacao,
+//           //avaliacao: product.avaliacao
+//         }));
+//         groupProductFormatted[groupName] = {
+//           products: productsList,
+//           totalPrice: groups[groupName].totalPrice,
+//           avgPrice: groups[groupName].avgPrice
+//         };
 //       }
-
-//     //console.log(encontrados);
-//     fs.writeFile('./produtos.json', JSON.stringify(produtosEncontrados), err => err ? console.log(err): null);
+//     }
+//     await fs.writeFile('./produtos.json', JSON.stringify(encontrados.flat()));
 //     console.log("Group Product Formatted:", groupProductFormatted);
-//     fs.writeFile('./groups.json', JSON.stringify(groupProductFormatted), err => err ? console.log(err): null);
+//     await fs.writeFile('./groups.json', JSON.stringify(groupProductFormatted));
 
-//     // Retorna o resultado da pesquisa em formato JSON
-//     res.json(produtosEncontrados);
+//     console.log("Operações concluídas com sucesso!");
 //   } catch (error) {
-//     // Se ocorrer um erro, envia uma resposta com status 500 e mensagem de erro
-//     res.status(500).json(error);
-//     console.log(error);
+//     console.log("Erro:", error);
 //   }
-// });
-
-// async function scrapeAmazonProducts(nomeProduto) {
-//   const browser = await puppeteer.launch({headless: false});
-//   const page = await browser.newPage();
-
-//   const url = amazonURLBase + encodeURIComponent(nomeProduto);
-
-//   await page.goto(url, { waitUntil: 'domcontentloaded' });
-//   await page.waitForSelector('.s-card-container.s-overflow-hidden.aok-relative.puis-expand-height.puis-include-content-margin.puis');
-
-//   // Executa o script no contexto da página para extrair os produtos
-//   const products = await page.evaluate(() => {
-//     const productElements = document.querySelectorAll('.s-card-container.s-overflow-hidden.aok-relative.puis-expand-height.puis-include-content-margin.puis');
-//     const productsList = [];
-
-//     productElements.forEach((product) => {
-//       const titleElement = product.querySelector('.a-size-base-plus.a-color-base.a-text-normal');
-//       const title = titleElement ? titleElement.textContent.trim() : '';
-
-//       const linkElement = product.querySelector('.a-link-normal.s-no-outline');
-//       const link = linkElement ? linkElement.getAttribute('href') : '';
-//       //const linkConcat = amazonURL + link;
-
-//       const priceElement = product.querySelector('.a-offscreen');
-//       const price = priceElement ? priceElement.textContent.trim() : '';
-
-//       const imageElement = product.querySelector('.s-image');
-//       const image = imageElement ? imageElement.getAttribute('src') : '';
-
-//       productsList.push({
-//         title,
-//         link,
-//         price,
-//         image,
-//       });
-//     });
-
-//     return productsList;
-//   });
-
-//   await browser.close();
-
-//   // Retorna os produtos extraídos
-//   return products;
 // }
 
-// app.listen(port, () => {
-//   console.log(`Servidor rodando em http://localhost:${port}`);
+
+
+
+
+// for (let i= 0; i < encontrados.length; i++) {
+//   const product = encontrados[i];
+
+//   const productData = {
+//     pdt_descricao: product.titulo,
+//     pdt_preco: product.preco,
+//     pdt_imagem: product.imagem,
+//     pdt_avaliacao: 4.2,
+//     pdt_adicionadoem: '2022-11-11',
+//     pdt_alteradoem: '2022-11-11',
+//     pdt_link: product.link,
+//     for_id: product.id_fornecedor,
+//     grp_id: 1, 
+//   };
+
+//   try {
+//     const apiResponse = await api.request('http://localhost:3000/products', 'POST', productData);
+//     console.log(`Produto ${i} salvo na API:`, apiResponse);
+//   } catch (error) {
+//     console.log(`Erro ao salvar produto ${i} na API:`, error);
+//   }
+// }
+//   } catch (error) {
+//     console.log("\n" + error);
+//   }
+// }
+
+
+
+// async function app() {
+
+//   try {
+
+//     // Array para armazenar os resultados finais
+//     const encontrados = [];
+
+
+//     let sliceSize;
+
+//     for (const produto of pesquisa) {
+//       const sliceLength = produto.split(" ").length;
+
+
+
+//       if (sliceLength <= 2) {
+//         sliceSize = sliceLength + 2;
+//       } else {
+//         sliceSize = sliceLength + 3;
+//       }
+
+//       // const produtosCB = await scraperCB.scrape(produto);
+//       // encontrados.push(...produtosCB);
+     
+
+//       const produtosAmazon = await scraperAmazon.scrape(produto);
+//       encontrados.push(...produtosAmazon);
+
+//       // const produtosKabum = await scraperKabum.scrape(produto);
+//       // encontrados.push(...produtosKabum);
+
+//       // const produtosPontoFrio = await scraperPontoFrio.scrape(produto);
+//       // encontrados.push(...produtosPontoFrio);
+
+//       // const produtosSub = await scraperSub.scrape(produto);
+//       // encontrados.push(...produtosSub);
+
+//       // const produtosExtra = await scraperExtra.scrape(produto);
+//       // encontrados.push(...produtosExtra);
+
+//       // const produtosMagalu = await scraperMagalu.scrape(produto);
+//       // encontrados.push(...produtosMagalu);
+
+//       // const produtosML = await scraperML.scrape(produto);
+//       // encontrados.push(...produtosML);
+
+//     }
+//     const groups = createGroup.createProductGroups(encontrados, sliceSize);
+//     const groupProductFormatted = {};
+
+//     // Exibe os grupos resultantes
+//     for (const groupName in groups) {
+//       if (groups[groupName] && Array.isArray(groups[groupName]) && groups[groupName].length > 0) {
+//         const productsList = groups[groupName].map((product) => ({
+//           titulo: product.titulo,
+//           loja: product.loja,
+//           preco: product.preco,
+//           avaliacao: product.avaliacao
+//         }));
+//         groupProductFormatted[groupName] = productsList;
+//       }
+//     }
+
+
+
+//     fs.writeFile('./produtos.json', JSON.stringify(encontrados), err => err ? console.log(err) : null);
+
+//     console.log("Group Product Formatted:", groupProductFormatted);
+
+//     await new Promise((resolve) => {
+//    fs.writeFile('./groups.json', JSON.stringify(groupProductFormatted), (err) => {
+//       if (err) console.log(err);
+//       resolve();
+//    });
 // });
+
+
+
+
+
+
